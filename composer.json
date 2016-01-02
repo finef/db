@@ -1,0 +1,13 @@
+{
+    "name": "fine/db",
+    "description": "Fine Database Component",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": ">=5.4.0"
+    },
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": { "Fine\\Db\\": "src" }
+    }
+}
