@@ -1,6 +1,10 @@
 <?php
 
-class f_db_mysql
+namespace \Fine\Db;
+
+use \Fine\Container\Container;
+
+class MysqlClient extends Container
 {
 
     protected $_connect;
@@ -9,10 +13,13 @@ class f_db_mysql
 
     public function connect($sHostname, $sUsername, $sPassword)
     {
-        if (($this->_connect = @mysqli_connect($sHostname, $sUsername, $sPassword))) {
+        $this->_connect = @mysqli_connect($sHostname, $sUsername, $sPassword);
+
+        if ($this->_connect) {
             return $this;
         }
-        throw new f_db_exception_connection($this->errorMsg(), $this->errorNo());
+
+        /* @TODO exception */
     }
 
     public function selectDb($sDatabaseName)
@@ -20,48 +27,41 @@ class f_db_mysql
         if (mysqli_select_db($this->_connect, $sDatabaseName)) {
             return $this;
         }
-        throw new f_db_exception_connection($this->errorMsg(), $this->errorNo());
+        /* @TODO exception */
     }
 
-    public function link($rConnectionLinkIdentifier = null)
+    public function setConnection($connection)
     {
-        if (func_num_args ()) {
-            $this->_connect = $rConnectionLinkIdentifier;
-            return $this;
-        }
+        $this->_connect = $connection;
+        return $this;
+    }
+
+    public function getConnection()
+    {
         return $this->_connect;
     }
 
-    /**
-     * Dodaje znaki unikowe dla potrzeb poleceń SQL, biorąc po uwagę zestaw znakow używany w połączeniu
-     *
-     * @param $sString string
-     * @return string
-     */
-    public function escape($sString)
+    public function escape($string)
     {
-        return mysqli_real_escape_string($this->_connect, $sString);
+        return mysqli_real_escape_string($this->_connect, $string);
     }
 
     public function result()
     {
         return $this->_result;
     }
-    
+
     /**
-     * Wykonuje zapytanie
-     *
-     * Zwraca
      *  - zasob zapytania lub falsza dla SELECT, SHOW, EXPLAIN i DESCRIBE;
      *  - true lub false dla UPDATE, DELETE...
      *
-     * @param string $sQuery Zapytanie SQL
+     * @param string $query Zapytanie SQL
      * @return resource
      */
-    public function query($sQuery)
+    public function query($query)
     {
-        $this->_query = $sQuery;
-        if (($this->_result = mysqli_query($this->_connect, $sQuery))) {
+        $this->_query = $query;
+        if (($this->_result = mysqli_query($this->_connect, $query))) {
             return $this->_result;
         }
         throw $this->_exceptionQuery();
@@ -70,13 +70,13 @@ class f_db_mysql
     /**
      * Zwraca wyselekcjonowany rekord jako tablice asocjacyjną
      *
-     * @param string $sQuery Zapytanie SQL
+     * @param string $query Zapytanie SQL
      * @return array|false
      */
-    public function row($sQuery)
+    public function row($query)
     {
-        $this->_query = $sQuery;
-        if (($this->_result = mysqli_query($this->_connect, $sQuery))) {
+        $this->_query = $query;
+        if (($this->_result = mysqli_query($this->_connect, $query))) {
             return mysqli_fetch_assoc($this->_result);
         }
         throw $this->_exceptionQuery();
@@ -85,13 +85,13 @@ class f_db_mysql
     /**
      * Zwraca wyselekcjonowane rekordy jako dwu wymiarową tablice, gdzie tablice wymiaru 2 jest asocjacyjna
      *
-     * @param string $sQuery Zapytanie SQL
+     * @param string $query Zapytanie SQL
      * @return array|false
      */
-    public function rows($sQuery)
+    public function rows($query)
     {
-        $this->_query = $sQuery;
-        if (($this->_result = mysqli_query($this->_connect, $sQuery))) {
+        $this->_query = $query;
+        if (($this->_result = mysqli_query($this->_connect, $query))) {
             $a = array();
             while ($i = mysqli_fetch_assoc($this->_result)) {
                 $a[] = $i;
@@ -106,13 +106,13 @@ class f_db_mysql
      * Zwraca jedno wymiarową tablice numeryczną
      * gdzie wartością pola tablicy jest pierwsze pole z wyselekcjonowanych rekordow
      *
-     * @param string $sQuery Zapytanie SQL
+     * @param string $query Zapytanie SQL
      * @return array|false
      */
-    public function col($sQuery)
+    public function col($query)
     {
-        $this->_query = $sQuery;
-        if (($this->_result = mysqli_query($this->_connect, $sQuery))) {
+        $this->_query = $query;
+        if (($this->_result = mysqli_query($this->_connect, $query))) {
             $a = array();
             while ($i = mysqli_fetch_row($this->_result)) {
                 $a[] = $i[0];
@@ -125,13 +125,13 @@ class f_db_mysql
     /**
      * Zwraca jedno wymiarową tablice asocjacyjną gdzie kluczem jest pierwsze pole a wartością drugie z wyselekcjonowanych rekordow
      *
-     * @param string $sQuery Zapytanie SQL
+     * @param string $query Zapytanie SQL
      * @return array|false
      */
-    public function cols($sQuery)
+    public function cols($query)
     {
-        $this->_query = $sQuery;
-        if (($this->_result = mysqli_query($this->_connect, $sQuery))) {
+        $this->_query = $query;
+        if (($this->_result = mysqli_query($this->_connect, $query))) {
             $a = array();
             while ($i = mysqli_fetch_row($this->_result)) {
                 $a[$i[0]] = $i[1];
@@ -144,13 +144,13 @@ class f_db_mysql
     /**
      * Zwraca wartosc pierwszego pola z pierwszego wyselekcjonowanego rekordu
      *
-     * @param string $sQuery Zapytanie SQL
+     * @param string $query Zapytanie SQL
      * @return string
      */
-    public function val($sQuery)
+    public function val($query)
     {
-        $this->_query = $sQuery;
-        if (($this->_result = mysqli_query($this->_connect, $sQuery))) {
+        $this->_query = $query;
+        if (($this->_result = mysqli_query($this->_connect, $query))) {
             if (($a = mysqli_fetch_row($this->_result))) {
                 return $a[0];
             }
@@ -158,17 +158,17 @@ class f_db_mysql
         }
         throw $this->_exceptionQuery();
     }
-    
+
     /**
      * Zwraca wyselekcjonowany rekord jako tablice zwykłą (numeryczną)
      *
-     * @param string $sQuery Zapytanie SQL
+     * @param string $query Zapytanie SQL
      * @return array
      */
-    public function rowNum($sQuery)
+    public function rowNum($query)
     {
-        $this->_query = $sQuery;
-        if (($this->_result = mysqli_query($this->_connect, $sQuery))) {
+        $this->_query = $query;
+        if (($this->_result = mysqli_query($this->_connect, $query))) {
             return mysqli_fetch_row($this->_result);
         }
         throw $this->_exceptionQuery();
@@ -177,13 +177,13 @@ class f_db_mysql
     /**
      * Zwraca wyselekcjonowane rekordy jako dwu wymiarową tablice zwykłą (numeryczną)
      *
-     * @param string $sQuery Zapytanie SQL
+     * @param string $query Zapytanie SQL
      * @return array|flase Tablica lub falsz
      */
-    public function rowsNum($sQuery)
+    public function rowsNum($query)
     {
-        $this->_query = $sQuery;
-        if (($this->_result = mysqli_query($this->_connect, $sQuery))) {
+        $this->_query = $query;
+        if (($this->_result = mysqli_query($this->_connect, $query))) {
             $a = array();
             while ($i = mysqli_fetch_row($this->_result)) {
                 $a[] = $i;
@@ -192,18 +192,18 @@ class f_db_mysql
         }
         throw $this->_exceptionQuery();
     }
-    
+
     /**
      * Zwraca wyselekcjonowane rekordy jako dwu wymiarową tablice
      * gdzie kluczem jest pierwsze pole a wartością jest tablica asocjacyjna
      *
-     * @param string $sQuery Zapytanie SQL
+     * @param string $query Zapytanie SQL
      * @return array|flase Tablica lub falsz
      */
-    public function keyed($sQuery)
+    public function keyed($query)
     {
-        $this->_query = $sQuery;
-        if (($this->_result = mysqli_query($this->_connect, $sQuery))) {
+        $this->_query = $query;
+        if (($this->_result = mysqli_query($this->_connect, $query))) {
             $a = array();
             while ($i = mysqli_fetch_row($this->_result)) {
                 $a[$i[0]] = $i;
@@ -238,7 +238,7 @@ class f_db_mysql
         return mysqli_fetch_assoc($this->_result);
     }
 
-    public function fetchUsingResult($rQueryResult)
+    public function fetchByResult($rQueryResult)
     {
         return mysqli_fetch_assoc($rQueryResult);
     }
@@ -253,7 +253,7 @@ class f_db_mysql
         return mysqli_fetch_row($this->_result);
     }
 
-    public function fetchNumUsingResult($rQueryResult)
+    public function fetchNumByResult($rQueryResult)
     {
         return mysqli_fetch_row($rQueryResult);
     }
@@ -273,7 +273,7 @@ class f_db_mysql
      *
      * @return int|false
      */
-    public function countSelectedUsingResult($rQueryResult)
+    public function countSelectedByResult($rQueryResult)
     {
         return mysqli_num_rows($rQueryResult);
     }
@@ -316,32 +316,18 @@ class f_db_mysql
     /**
      * Buduje bezpieczne zapytanie SQL metoda "zaslepek"
      *
-     * @param string $sQuery Zapytanie z "zaslepkami"
+     * @param string $query Zapytanie z "zaslepkami"
      * @param array $aArgs zmienne do przeparsowania
      * @return string Zapytanie SQL
      *
      */
-    public function prepare($sQuery, $asVar)
+    public function prepare($query, array $vars)
     {
-        if (!is_array($asVar)) {
-            $asVar = array($asVar);
+        foreach ($var as $name => $value) {
+            $query = str_replace($name, $this->escape($value), $query);
         }
-        $offest = 0;
-        $query  = $sQuery;
-        foreach ($asVar as $i) {
-            if (false !== $pos = strpos($query, '?')) {
-                $i      = $this->escape($i);
-                $offest = $pos + strlen($i);
-                $query = substr($query, 0, $pos) . $i . substr($query, $pos + 1);
-            }
-            else {
-                throw new f_db_exception_invalidArgument(
-                    "Too not enough \"?\" chars(" . substr_count($sQuery, "?") . ") in query"
-                    . " and too many vars(" . count($asVar) . ") passed in second argument"
-                );
-            }
-        }
-        return $sQuery;
+
+        return $query;
     }
 
     protected function _exceptionQuery()
