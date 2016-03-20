@@ -1,6 +1,6 @@
 <?php
 // @TODO Iterator, Countable
-namespace \Fine\Db\Mysql;
+namespace \Fine\Db;
 
 use \Fine\Std;
 use \Fine\Paging\PagingInterface;
@@ -8,7 +8,7 @@ use \Fine\Paging\PagingInterface;
 class Table implements TableInteraface, Iterator, Countable
 {
 
-    use ConstructTrait, ParamTrait;
+    use ParamTrait;
 
     const PARAM_FIELD    = 'field';
     const PARAM_OPERATOR = 'operator';
@@ -814,17 +814,6 @@ class Table implements TableInteraface, Iterator, Countable
       return $this;
     }
 
-    /**
-    * Modyfikuje wszystkie rekordy w tabeli
-    *
-    * @param array $aData Tablica jedno wymiarowa asocjacyjna
-    * @return $this
-    */
-    public function updateAll($aData = null)
-    {
-      $this->update($aData, array('1'));
-      return $this;
-    }
 
     /**
     * Usuwa rekord lub rekordy
