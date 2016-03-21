@@ -91,13 +91,19 @@ class Db extends Container
         // select, prefix
         $select = null;
         if (isset($statement['select'])) {
-            $select = [];
-            foreach ($statement['select'] as $k => $v) {
-                $select[] =  "$v" . (is_int($k) ? '' : ' as ' . $k);
+            if (!is_array($statement['select'])) {
+                $select = $statement['select'];
+            }
+            else {
+                $col = [];
+                foreach ($statement['select'] as $k => $v) {
+                    $col[] =  "$v" . (is_int($k) ? '' : ' as ' . $k);
+                }
+                $select = implode(', ', $col);
             }
             $select = 'SELECT ' 
                     . (array_key_exists('prefix', $statement) ? ' ' . $statement['prefix'] : '')
-                    . implode(', ', $select);
+                    . $select;
         }
         
         // from, alias
