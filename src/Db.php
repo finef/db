@@ -16,7 +16,6 @@ class Db extends Container
     }
 
     /**
-     * 
      * @return PDO
      */
     public function getPdo()
@@ -37,123 +36,127 @@ class Db extends Container
     /**
      * @return PDOStatement
      */
-    public function query($statement)
+    public function query($stmt)
     {
-        return $this->getPdo()->query($this->sql($statement));
+        return $this->getPdo()->query($this->sql($stmt));
     }
     
     /**
      * @return PDOStatement
      */
-    public function prepare($statement)
+    public function prepare($stmt)
     {
-        return $this->getPdo()->prepare($this->sql($statement));
+        return $this->getPdo()->prepare($this->sql($stmt));
     }
     
-    public function fetch($statement)
+    public function fetch($stmt)
     {
-        $this->query($this->sql($statement))->fetch(PDO::FETCH_ASSOC);
+        $this->query($this->sql($stmt))->fetch(PDO::FETCH_ASSOC);
     }
             
-    public function fetchAll($statement)
+    public function fetchAll($stmt)
     {
-        return $this->query($this->sql($statement))->fetchAll(PDO::FETCH_ASSOC);
+        return $this->query($this->sql($stmt))->fetchAll(PDO::FETCH_ASSOC);
     }
     
-    public function fetchCol($statement)
+    public function fetchCol($stmt)
     {
-        return $this->query($this->sql($statement))->fetchColumn();
+        return $this->query($this->sql($stmt))->fetchColumn();
     }
     
-    public function fetchVal($statement)
+    public function fetchVal($stmt)
     {
-        $val = $this->query($this->sql($statement))->fetchColumn();
+        $val = $this->query($this->sql($stmt))->fetchColumn();
         return is_array($val) ? $val[0] : null;
     }
     
-    public function fetchKeyPair($statement)
+    public function fetchKeyPair($stmt)
     {
-        return $this->query($this->sql($statement))->fetchAll(\PDO::FETCH_KEY_PAIR);
+        return $this->query($this->sql($stmt))->fetchAll(\PDO::FETCH_KEY_PAIR);
     }
     
-    public function fetchKeyed($statement)
+    public function fetchKeyed($stmt)
     {
-        return $this->query($this->sql($statement))->fetchAll(\PDO::FETCH_GROUP | \PDO::FETCH_UNIQUE | \PDO::FETCH_ASSOC);
+        return $this->query($this->sql($stmt))->fetchAll(\PDO::FETCH_GROUP | \PDO::FETCH_UNIQUE | \PDO::FETCH_ASSOC);
     }
     
-    public function sql($statement)
+    public function sql($stmt)
     {
-        
-        if (is_string($statement)) {
-            return $statement;
+        if (is_string($stmt)) {
+            return $stmt;
         }
         
         // select, prefix
         $select = null;
-        if (isset($statement['select'])) {
-            if (!is_array($statement['select'])) {
-                $select = $statement['select'];
+        if (isset($stmt[':select'])) {
+            if (!is_array($stmt[':select'])) {
+                $select = $stmt[':select'];
             }
             else {
                 $col = [];
-                foreach ($statement['select'] as $k => $v) {
-                    $col[] =  "$v" . (is_int($k) ? '' : ' as ' . $k);
+                foreach ($stmt[':select'] as $k => $v) {
+                    $col[] =  (strpos($v, ' ') !== false ? $v : "`$v`")
+                        . (is_int($k) 
+                            ? '' 
+                            : ' as ' . (strpos($k, ' ') !== false ? $k : "'$k'")
+                        );
                 }
                 $select = implode(', ', $col);
             }
             $select = 'SELECT ' 
-                    . (array_key_exists('prefix', $statement) ? ' ' . $statement['prefix'] : '')
+                    . (array_key_exists(':prefix', $stmt) ? ' ' . $stmt[':prefix'] : '')
                     . $select;
         }
         
         // from, alias
-        $from = array_key_exists('from', $statement) 
+        $from = array_key_exists(':from', $stmt) 
             ? ' FROM ' 
-              . '`' . $statement['from'] . '`' 
-              . (array_key_exists('alias', $statement) ? ' as ' . $statement['alias'] : '')
+              . '`' . $stmt[':from'] . '`' 
+              . (array_key_exists(':alias', $stmt) ? ' as ' . $stmt[':alias'] : '')
             : null;
         
         // join
-        $join = array_key_exists('join', $statement) ? ' ' . implode(' ', $statement['join']) : null;
+        $join = array_key_exists(':join', $stmt) ? ' ' . implode(' ', $stmt[':join']) : null;
         
         // group
-        $group = array_key_exists('group', $statement) ? ' GROUP BY ' . $statement['group'] : null;
+        $group = array_key_exists(':group', $stmt) ? ' GROUP BY ' . $stmt[':group'] : null;
         
         // having
-        $having = array_key_exists('having', $statement) ? ' HAVING ' . $this->sqlCondition($statement['having']) : null;
+        $having = array_key_exists(':having', $stmt) ? ' HAVING ' . $this->sqlCondition($stmt[':having']) : null;
         
         // group
-        $order = array_key_exists('order', $statement) ? ' ORDER BY ' . $statement['order'] : null;
+        $order = array_key_exists(':order', $stmt) ? ' ORDER BY ' . $stmt[':order'] : null;
         
         // limit, offset
         $limit = null;
         $offset = null;
-        if (isset($statement['paging'])) {
-           $limit =  ' LIMIT ' . $statement['paging']->getLimit();
-           $offset = ' OFFSET ' . $statement['paging']->getOffset();
+        if (array_key_exists(':paging', $stmt)) {
+           $limit =  ' LIMIT ' . $stmt[':paging']->getLimit();
+           $offset = ' OFFSET ' . $stmt[':paging']->getOffset();
         }
         else {
-            if (array_key_exists('limit', $statement)) {
-                $limit = ' LIMIT ' . $statement['limit'];
+            if (array_key_exists(':limit', $stmt)) {
+                $limit = ' LIMIT ' . $stmt[':limit'];
             }
-            if (array_key_exists('offset', $statement)) {
-                $offset = ' OFFSET ' . $statement['offset'];
+            if (array_key_exists(':offset', $stmt)) {
+                $offset = ' OFFSET ' . $stmt[':offset'];
             }
         }
         
-        unset($statement['select'], $statement['prefix'], 
-              $statement['from'], $statement['alias'], $statement['join'],
-              $statement['group'], $statement['having'], $statement['order'],
-              $statement['paging'], $statement['limit'], $statement['offset']);
+        unset($stmt[':select'], $stmt[':prefix'], 
+              $stmt[':from'], $stmt['alias'], $stmt[':join'],
+              $stmt[':group'], $stmt[':having'], $stmt[':order'],
+              $stmt[':paging'], $stmt[':limit'], $stmt[':offset']);
         
         // everything else is where
-        $where = $this->sqlCondition($statement);
+        $where = $this->sqlCondition($stmt);
         if ($where) {
             $where = ' WHERE ' . $where;
         }
         else {
             $where = null;
         }
+                
         
         return $select . $from . $join. $where . $group . $having . $order . $limit . $offset;
     }
@@ -162,69 +165,80 @@ class Db extends Container
     {
         
         $logical = ' AND ';
+        $sql     = [];
 
         foreach ($condition as $key => $value) {
-
+            
+            // <int> => [], <int> => '<raw sql>'
             if (is_int($key)) {
-                if (is_array($value)) {
-                    $condition[] = '(' . $this->sqlCondition($value) . ')';
+                $sql[] = is_array($value) ? '(' . $this->sqlCondition($value) . ')' : $value;
+                continue;
+            }
+            
+            // '#(a = {a} OR b = {b})' => [{a} => '1', {b} => '2']
+            if ($key[0] === '%') {
+                $key = substr($key, 1);
+                foreach ($value as $find => $replace) {
+                    $key = str_replace($find, $this->escape($replace), $key);
                 }
-                else {
-                    $condition[] = $value;
-                }
+                $sql[] = $key;
+            }
+            
+            // logical operator - AND, OR
+            if ($key === ':operator') {
+                $logical = ' ' . trim($value) . ' ';
                 continue;
             }
 
-            switch ($key) {
+            $comparison = '=';
+            
+            if (strpos($key, ' ') !== false) {
+                list ($key, $comparison) = explode(' ', $key, 2);
+            }
+            
+            $key = $key[0] === '*' ? substr($key, 1) : "`$key`";
+            
+            
+            if  (is_array($value) && $comparison === '=') {
+                $comparison = 'IN';
+            }
 
-                case 'operator':
-                    $logical = ' ' . trim($value) . ' ';
+            switch ($comparison) {
+
+                case 'BETWEEN':
+                case 'NOT BETWEEN':
+                    $sql[] = "$key $comparison"
+                             . " '{$this->escape($value[0])}'"
+                             . " AND '{$this->escape($value[1])}'";
+                    break;
+
+                case 'IN':
+                case 'NOT IN':
+                    foreach ($value as $k => $v) {
+                        $value[$k] = $this->escape($v);
+                    }
+                    $sql[] = "$key $comparison ('" . implode("','", $value) . "')";
                     break;
 
                 default:
-
-                    $comparison = '=';
-                    if (strpos($key, ' ') !== false) {
-                        list ($key, $comparison) = explode(' ', $key, 2);
-                    }
-                    if  (is_array($value) && $comparison === '=') {
-                        $comparison = 'IN';
-                    }
-
-                    switch ($comparison) {
-
-                        case 'BETWEEN':
-                        case 'NOT BETWEEN':
-                            $condition[] = "$key $comparison"
-                                     . " '{$this->escape($value[0])}'"
-                                     . " AND '{$this->escape($value[1])}'";
-                            break;
-
-                        case 'IN':
-                        case 'NOT IN':
-                            foreach ($value as $k => $v) {
-                                $value[$k] = $this->escape($v);
-                            }
-                            $condition[] = "$key $comparison ('" . implode("','", $value) . "')";
-                            break;
-
-                        default:
-                            $condition[] = "$key $comparison '{$this->escape($value)}'";
-                            break;
-
-                    }
+                    $sql[] = "$key $comparison '{$this->escape($value)}'";
+                    break;
 
             }
 
-          
         }
         
-        return implode($logical, $condition);
+        return implode($logical, $sql);
 
     }
     
+    public function count($table, array $statement, $expr)
+    {
+        return $this->_db->query("SELECT COUNT($expr) FROM `$table` WHERE " . $this->sqlCondition($statement));
+    }
+    
+    
     /**
-     * 
      * @param string $table
      * @param array $row
      * @return self
@@ -261,7 +275,7 @@ class Db extends Container
         return $this->query("INSERT INTO `{$table}` (`" . implode('`, `', $fields) . "`) VALUES " . implode(', ', $values));
     }
     
-    public function update($table, array $data, array $statement)
+    public function update($table, array $data, array $stmt)
     {
         $set = array();
         
@@ -274,12 +288,12 @@ class Db extends Container
             }
         }
 
-        return $this->query("UPDATE `{$table}` SET " . implode(", ", $set) . ' WHERE ' . $this->sqlCondition($statement));
+        return $this->query("UPDATE `{$table}` SET " . implode(", ", $set) . ' WHERE ' . $this->sqlCondition($stmt));
     }
     
-    public function delete($table, array $statement)
+    public function delete($table, array $stmt)
     {
-        return $this->_db->query("DELETE FROM `{$table}` WHERE " . $this->sqlCondition($statement));
+        return $this->_db->query("DELETE FROM `{$table}` WHERE " . $this->sqlCondition($stmt));
     }
     
 }

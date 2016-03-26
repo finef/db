@@ -158,8 +158,8 @@ class Model
     public function setFieldAndVal($aKeyValue)
     {
         $this->setFields(array_keys($aKeyValue));
-        $this->setVal($aKeyValue);
-        return $this;
+        $this->setVal($aKeyValue);                    
+        return $this;                    
     }
     
     public function setResult($result)
@@ -182,7 +182,6 @@ class Model
         if ($this->_key !== null && isset($result[$this->_key])) {
             $this->{$this->_key} = $result[$this->_key];
         }
-        
         return $this;
     }
     
@@ -355,14 +354,14 @@ class Model
         $sql = [];
         
         if ($select) {
-            $sql['select'] = $this->_field;
+            $sql[':select'] = $this->_field;
         }
         
         if ($from) {
-            $sql['from'] = $this->_table;
+            $sql[':from'] = $this->_table;
         }
         
-        $sql = array_merge($sql, $this->_param, (array)$param);
+        $sql = array_merge($this->_param, (array)$param, $sql);
         
         return $this->_db->sql($sql);
     }
