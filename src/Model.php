@@ -2,20 +2,21 @@
 
 namespace \Fine\Db;
 
-use \Fine\Std\ParamTrait;
 use \Fine\Paging\PagingInterface;
 
 class Model
 {
     
-    use ParamTrait;
-
     protected $_db;
     protected $_table;
+    protected $_alias;
     protected $_key;
     protected $_field;
+    protected $_prefix;
     protected $_param;
     protected $_result;
+    
+    /* setup */
     
     public function setDb(Db $db)
     {
@@ -120,6 +121,8 @@ class Model
         return false;
     }
     
+    /* value */
+    
     public function setId($id) 
     {
         $this->_id = $id;
@@ -189,6 +192,191 @@ class Model
     {
         return $this->_result;
     }
+    
+    /* param */
+    
+    public function setParam($name, $value)
+    {
+        $this->_param[$name] = $value;
+        return $this;
+    }
+
+    public function hasParam($name)
+    {
+        return array_key_exists($name, $this->_param);
+    }
+
+    public function getParam($name)
+    {
+        return $this->_param[$name];
+    }
+
+    public function removeParam($name)
+    {
+        unset($this->_param);
+    }
+
+    public function setParams(array $params)
+    {
+        foreach ($params as $name => $value) {
+            if (is_int($name)) {
+                $this->_param[] = $name;
+            } else {
+                $this->_param[$name] = $value;
+            }
+        }
+    }
+
+    public function hasParams(array $params)
+    {
+        foreach ($params as $name => $value) {
+            if ($this->hasParam($name, $value)) {
+                continue;
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    public function getParams()
+    {
+        return $this->_param;
+    }
+
+    public function removeParams()
+    {
+        $this->_param = array();
+        return $this;
+    }
+
+    public function param($arg1 = null, $arg2 = null)
+    {
+        switch (func_num_args()) {
+
+            case 0:
+                return $this->getParams();
+
+            case 1:
+                if (is_array($arg1)) {
+                    return $this->setParams($arg1);
+                } else if (is_null($arg1)) {
+                    return $this->removeParams();
+                } else {
+                    return $this->getParams($arg1);
+                }
+
+            case 2:
+                $this->_param[$arg1] = $arg2;
+                return $this;
+
+        }        
+    }
+    
+    public function setPrefix($prefix) 
+    {
+        $this->_param[':prefix'] = $prefix;
+        return $this;
+    }
+
+    public function getPrefix() 
+    {
+        return $this->_param[':prefix'];
+    }
+
+    public function setAlias($alias) 
+    {
+        $this->_param[':alias'] = $alias;
+        return $this;
+    }
+
+    public function getAlias() 
+    {
+        return $this->_param[':alias'];
+    }
+
+    public function setGroup($group) 
+    {
+        $this->_param[':group'] = $group;
+        return $this;
+    }
+
+    public function getGroup() 
+    {
+        return $this->_param[':group'];
+    }
+
+    public function setHaving($having) 
+    {
+        $this->_param[':having'] = $having;
+        return $this;
+    }
+
+    public function getHaving() 
+    {
+        return $this->_param[':having'];
+    }
+
+    public function setOrder($order) 
+    {
+        $this->_param[':order'] = $order;
+        return $this;
+    }
+
+    public function getOrder() 
+    {
+        return $this->_param[':order'];
+    }
+
+    public function setPaging($paging) 
+    {
+        $this->_param[':paging'] = $paging;
+        return $this;
+    }
+
+    public function getPaging() 
+    {
+        return $this->_param[':paging'];
+    }
+
+    public function setLimit($limit) 
+    {
+        $this->_param[':limit'] = $limit;
+        return $this;
+    }
+
+    public function getLimit() 
+    {
+        return $this->_param[':limit'];
+    }
+
+    public function setOffset($offset) 
+    {
+        $this->_param[':offset'] = $offset;
+        return $this;
+    }
+
+    public function getOffset() 
+    {
+        return $this->_param[':offset'];
+    }
+    
+    public function addJoin()
+    {
+        
+    }
+    
+    public function addJoins()
+    {
+        
+    }
+    
+    public function getJoin()
+    {
+        
+    }
+    
+    /* fetch */
     
     public function select($params = null)
     {
@@ -285,6 +473,8 @@ class Model
         return $this->selectInserted()->getResult();
     }
 
+    /* save */
+    
     public function insert(array $data = null)
     {
         $this->_db->insert($this->_table, $data ?: $this->getVal());
@@ -331,23 +521,6 @@ class Model
 
         return $this;
     }    
-    
-    public function joinRaw()
-    {
-    }
-    
-    public function join()
-    {
-    }
-
-    public function leftJoin()
-    {
-    }
-    
-    public function addRelation()
-    {
-    }
-
 
     protected function _sql($param, $select, $from)
     {
@@ -355,10 +528,16 @@ class Model
         
         if ($select) {
             $sql[':select'] = $this->_field;
+            if ($this->_prefix !== null) {
+                $sql[':prefix'] = $this->_prefix;
+            }
         }
         
         if ($from) {
             $sql[':from'] = $this->_table;
+            if ($this->_alias !== null) {
+                $sql[':alias'] = $this->_alias;
+            }
         }
         
         $sql = array_merge($this->_param, (array)$param, $sql);
