@@ -20,13 +20,13 @@ class Model
     
     public function setDb(Db $db)
     {
-      $this->_db = $db;
-      return $this;
+        $this->_db = $db;
+        return $this;
     }
 
     public function getDb()
     {
-      return $this->_db;
+        return $this->_db;
     }
 
     public function setTable($table)
@@ -273,6 +273,48 @@ class Model
         }        
     }
     
+    public function setParamId($id)
+    {
+        $this->_param[$this->_key] = $id;
+        return $this;
+    }
+
+    public function getParamId($id)
+    {
+        return $this->_param[$this->_key];
+    }
+
+    public function paginate(PagingInterface $paging = null)
+    {
+        if ($paging !== null) {
+            $this->setPaging($paging);
+        }
+
+//        $group = null;
+//        if ($this->hasParam(':group')) {
+//            $group = $this->getParam(':group');
+//            $this->removeParam(':group');
+//        }
+//
+//        $order = null;
+//        if ($this->hasParam(':order')) {
+//            $order = $this->getParam(':order');
+//            $this->removeParam(':order');
+//        }
+
+        $this->_param[':paging']->setAll($this->fetchCount())->paginate();
+
+//        if ($group !== null) {
+//            $this->setParam(':group', $group);
+//        }
+//
+//        if ($order !== null) {
+//            $this->setParam(':order', $order);
+//        }
+
+        return $this;
+    }
+    
     public function setPrefix($prefix) 
     {
         $this->_param[':prefix'] = $prefix;
@@ -361,19 +403,29 @@ class Model
         return $this->_param[':offset'];
     }
     
-    public function addJoin()
+    public function addJoin($join, array $fields = null)
     {
-        
+        $this->_param[':join'][] = $join;
+        if ($fields !== null) {
+            $this->addFields($fields);
+        }
+        return $this;
     }
     
-    public function addJoins()
+    public function addJoins(array $joins, array $fields = nul)
     {
-        
+        foreach ($joins as $join) {
+            $this->addJoin($join);
+        }
+        if ($fields !== null) {
+            $this->addFields($fields);
+        }
+        return $this;
     }
     
     public function getJoin()
     {
-        
+        return $this->_param[':join'];
     }
     
     /* fetch */

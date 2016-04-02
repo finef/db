@@ -80,6 +80,36 @@ class Db extends Container
         return $this->query($this->sql($stmt))->fetchAll(\PDO::FETCH_GROUP | \PDO::FETCH_UNIQUE | \PDO::FETCH_ASSOC);
     }
     
+    /**
+     * Builds fragmenet or full raw sql query
+     * 
+     * $stmt options:
+     * - ':select' => ['post_id', 'title' => 'post_title'] 
+     * - ':select' => 'post_id, post_title as title'
+     * - ':prefix' => 'SQL_NO_CACHE DISTINCT'
+     * - ':from'   => 'post'
+     * - ':alias'  => 'p'
+     * - ':join'   => ['JOIN author ON (author_id = post_id_author)', 'LEFT JOIN img ON (author_id_img = img_id)']
+     * - ':group'  => 'post_id'
+     * - ':having' => 'post_id > 0'
+     * - ':having' => ['post_id >' =>  '0']
+     * - ':order'  => 'post_published DESC'
+     * - ':paging' => \Fine\Paging\PagingInterface
+     * - ':limit'  => 10,
+     * - ':offset' => 0,
+     * - 'post_level' => [1, 2, 3] // `post_level` IN ('1', '2',  '3')
+     * - 'post_level BETWEEN' => [4, 5] // `post_level` BETWEEN '4' AND '5'
+     * - 'post_level <>' => 4 // `post_level` <> '4'
+     * - '*post_level <>' => 4 // post_level <> '4'
+     * - "#post_level != '{a}')" => ['{a}' => 4] // post_level != '4'
+     * - ':operator' => 'AND' // values: AND, OR; default: AND; logical operator that joins all conditions
+     * - [':operator' => 'OR', 'post_level' => '1'
+     *    [':operator' => 'OR', 'post_level' => '2', 'post_level' => '3']]
+     *   // post_level = '1' OR (post_level = '2' OR  post_level = '3')
+     * 
+     * @param array $stmt
+     * @return string Sql
+     */
     public function sql($stmt)
     {
         if (is_string($stmt)) {
@@ -144,7 +174,7 @@ class Db extends Container
         }
         
         unset($stmt[':select'], $stmt[':prefix'], 
-              $stmt[':from'], $stmt['alias'], $stmt[':join'],
+              $stmt[':from'], $stmt[':alias'], $stmt[':join'],
               $stmt[':group'], $stmt[':having'], $stmt[':order'],
               $stmt[':paging'], $stmt[':limit'], $stmt[':offset']);
         
@@ -161,8 +191,12 @@ class Db extends Container
         return $select . $from . $join. $where . $group . $having . $order . $limit . $offset;
     }
     
-    public function sqlCondition(array $condition)
+    public function sqlCondition($condition)
     {
+        
+        if (is_string($condition)) {
+            return $condition;
+        }
         
         $logical = ' AND ';
         $sql     = [];
@@ -176,7 +210,7 @@ class Db extends Container
             }
             
             // '#(a = {a} OR b = {b})' => [{a} => '1', {b} => '2']
-            if ($key[0] === '%') {
+            if ($key[0] === '#') {
                 $key = substr($key, 1);
                 foreach ($value as $find => $replace) {
                     $key = str_replace($find, $this->escape($replace), $key);
