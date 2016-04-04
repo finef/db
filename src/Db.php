@@ -84,11 +84,12 @@ class Db extends Container
      * Builds fragmenet or full raw sql query
      * 
      * $stmt options:
-     * - ':select' => ['post_id', 'title' => 'post_title'] 
-     * - ':select' => 'post_id, post_title as title'
+     * - ':select' => ['post_id', 'title' => 'post_title']  // `post_id`, `post_title` as 'title'
+     * - ':select' => 'post_id, post_title as title' // post_id, post_title as title
+     * - ':select' => ['|count' => '|COUNT(*)']  // COUNT(*) as count
      * - ':prefix' => 'SQL_NO_CACHE DISTINCT'
      * - ':from'   => 'post'
-     * - ':alias'  => 'p'
+     * - ':from'   => ['p' => 'post']
      * - ':join'   => ['JOIN author ON (author_id = post_id_author)', 'LEFT JOIN img ON (author_id_img = img_id)']
      * - ':group'  => 'post_id'
      * - ':having' => 'post_id > 0'
@@ -100,8 +101,8 @@ class Db extends Container
      * - 'post_level' => [1, 2, 3] // `post_level` IN ('1', '2',  '3')
      * - 'post_level BETWEEN' => [4, 5] // `post_level` BETWEEN '4' AND '5'
      * - 'post_level <>' => 4 // `post_level` <> '4'
-     * - '*post_level <>' => 4 // post_level <> '4'
-     * - "#post_level != '{a}')" => ['{a}' => 4] // post_level != '4'
+     * - '|post_level <>' => 4 // post_level <> '4'
+     * - "|post_level != '{a}')" => ['{a}' => 4] // post_level != '4'
      * - ':operator' => 'AND' // values: AND, OR; default: AND; logical operator that joins all conditions
      * - [':operator' => 'OR', 'post_level' => '1'
      *    [':operator' => 'OR', 'post_level' => '2', 'post_level' => '3']]
@@ -123,15 +124,15 @@ class Db extends Container
                 $select = $stmt[':select'];
             }
             else {
-                $col = [];
+                $cols = [];
                 foreach ($stmt[':select'] as $k => $v) {
-                    $col[] =  (strpos($v, ' ') !== false ? $v : "`$v`")
-                        . (is_int($k) 
-                            ? '' 
-                            : ' as ' . (strpos($k, ' ') !== false ? $k : "'$k'")
-                        );
+                    $col = $v[0] === '|' ? substr($v, 1) : "`$v`";
+                    if (is_int($k)) {
+                        $col .= " " . ($k[0] === '|' ? substr($k, 1) : "'{$this->escape($k)}'");
+                    }
+                    $cols[] = $col;
                 }
-                $select = implode(', ', $col);
+                $select = implode(', ', $cols);
             }
             $select = 'SELECT ' 
                     . (array_key_exists(':prefix', $stmt) ? ' ' . $stmt[':prefix'] : '')
@@ -139,11 +140,21 @@ class Db extends Container
         }
         
         // from, alias
-        $from = array_key_exists(':from', $stmt) 
-            ? ' FROM ' 
-              . '`' . $stmt[':from'] . '`' 
-              . (array_key_exists(':alias', $stmt) ? ' as ' . $stmt[':alias'] : '')
-            : null;
+        $from = null;
+        if (array_key_exists(':from', $stmt)) {
+            $from = ' FROM ';
+            if (is_array()) {
+                $table = reset($stmt[':from']);
+                $alias = key($stmt[':from']);
+                $from .= "`$table` as '{$this->escape($alias)}'";
+            }
+            else if ($stmt[':from'][0] === '*') {
+                $from .= substr($stmt[':from'], 1);
+            }
+            else {
+                $from .= "`{$stmt[':from']}`";
+            }
+        }
         
         // join
         $join = array_key_exists(':join', $stmt) ? ' ' . implode(' ', $stmt[':join']) : null;
@@ -174,7 +185,7 @@ class Db extends Container
         }
         
         unset($stmt[':select'], $stmt[':prefix'], 
-              $stmt[':from'], $stmt[':alias'], $stmt[':join'],
+              $stmt[':from'], $stmt[':join'],
               $stmt[':group'], $stmt[':having'], $stmt[':order'],
               $stmt[':paging'], $stmt[':limit'], $stmt[':offset']);
         
@@ -210,7 +221,7 @@ class Db extends Container
             }
             
             // '#(a = {a} OR b = {b})' => [{a} => '1', {b} => '2']
-            if ($key[0] === '#') {
+            if ($key[0] === '|' && is_array($value)) {
                 $key = substr($key, 1);
                 foreach ($value as $find => $replace) {
                     $key = str_replace($find, $this->escape($replace), $key);
@@ -230,7 +241,7 @@ class Db extends Container
                 list ($key, $comparison) = explode(' ', $key, 2);
             }
             
-            $key = $key[0] === '*' ? substr($key, 1) : "`$key`";
+            $key = $key[0] === '|' ? substr($key, 1) : "`$key`";
             
             
             if  (is_array($value) && $comparison === '=') {

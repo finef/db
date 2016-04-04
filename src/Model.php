@@ -106,15 +106,8 @@ class Model
     public function hasField($field)
     {
         foreach ($this->_field as $alias => $name) {
-            if (is_int($alias)) {
-                if ($name === $field) {
-                    return true;
-                }
-            }
-            else {
-                if ($alias === $field) {
-                    return true;
-                }
+            if ($name === $field) {
+                return true;
             }
         }
 
@@ -428,6 +421,74 @@ class Model
         return $this->_param[':join'];
     }
     
+    public function link($to, $from = null, $joinType = 'JOIN', $fields = true)
+    {
+        // to
+        $toAlias = null;
+        $toSuffix = null;
+        if (is_array($to)) {
+            $toAlias = key($to);
+            $to      = current($to);
+        }
+        if (strpos($to, ':') !== false) {
+            list($to, $toSuffix) = explode(':', $to);
+            $toSuffix = "_$toSuffix";
+        }
+        $toModel = $this->getDb()->{$to};
+        
+        // from
+        $fromAlias = null;
+        if ($from === null) {
+            $from = $this->getTable();
+        }
+        else if (is_array($from)) {
+            $fromAlias = key($from);
+            $from      = current($from);
+        }
+        $fromModel = $this->getDb()->{$from};
+        
+        // fields
+        if ($fields === true) {
+            $fields = $this->getDb()->{$to}->getFields();
+        }
+        if (is_string($fields)) {
+            $this->addField($fields);
+        }
+        else if (is_array($fields)) {
+            $prefix = $toAlias ?: $to;
+            foreach ($fields as $k => $v) {
+                $fields[$k] = "|`$prefix`.`$v`";
+            }
+        }
+        
+        // n:1? 1:n? 1:1?
+        $ref = "{$from}_id_{$to}{$toSuffix}";
+        $dep = "{$to}_id_{$from}{$toSuffix}";
+        $toLink = $fromLink = null;
+        if ($fromModel->hasField($ref)) { // relation n:1 (ref)
+            $toLink = $toModel->getKey();
+            $fromLink = $ref;
+        }
+        else if ($toModel->hasField($dep)) { // relation 1:n (dep)
+            $toLink = $dep;
+            $fromLink = $fromModel->getKey();
+        }
+        else { // 1:1
+            $toLink = $toModel->getKey();
+            $fromLink = $fromModel->getKey();
+        }
+        
+        $this->addJoin(
+            $joinType 
+            . "`$to`" . ($toAlias !== null ? " as '{$this->escape($toAlias)}'" : '')
+            . " ON ("
+            . ($toAlias !== null ? "`{$this->escape($toAlias)}`." : '') . "`$toLink`"
+            . " = "
+            . ($fromAlias !== null ? "`{$this->escape($fromAlias)}`." : '') . "`$fromLink`"
+            . ")"
+        );
+    }
+
     /* fetch */
     
     public function select($params = null)
