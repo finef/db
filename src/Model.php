@@ -649,7 +649,7 @@ class Model
         if ($from) {
             $sql[':from'] = $this->_table;
             if ($this->_alias !== null) {
-                $sql[':alias'] = $this->_alias;
+                $sql[':from'] = [$this->_alias => $this->_table];
             }
         }
         
